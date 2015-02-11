@@ -380,13 +380,6 @@ module Yast
           # for matching the control file
           mode_to_check = Mode.mode
 
-          # file name
-          run_yast_at_boot = Builtins.sformat(
-            "%1/%2",
-            Installation.destdir,
-            Installation.run_yast_at_boot
-          )
-
           Builtins.y2milestone(
             "Checking RunRequired (%1, %2)",
             stage_to_check,
@@ -396,6 +389,6 @@ module Yast
         end
       end
       run_second_stage
-    end      
+    end
   end
 end
