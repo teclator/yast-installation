@@ -30,6 +30,7 @@ module Installation
     class << self
       # once the user selects a role, remember it in case they come back
       attr_accessor :original_role_id
+      attr_accessor :client_to_show
     end
 
     NON_OVERLAY_ATTRIBUTES = [
@@ -125,16 +126,17 @@ module Installation
       result = going_back ? :back : :next
       return result if clients.empty?
 
-      client_to_show = going_back ? clients.size - 1 : 0
+      self.class.client_to_show ||= 0
+
       loop do
-        result = Yast::WFM.CallFunction(clients[client_to_show],
+        result = Yast::WFM.CallFunction(clients[self.class.client_to_show],
           [{
             "going_back"  => going_back,
             "enable_next" => true,
             "enable_back" => true
           }])
 
-        log.info "client #{clients[client_to_show]} return #{result}"
+        log.info "client #{clients[self.class.client_to_show]} return #{result}"
 
         step = case result
         when :auto
@@ -149,11 +151,12 @@ module Installation
           raise "unsupported client response #{result.inspect}"
         end
 
-        client_to_show += step
-        break unless (0..(clients.size - 1)).cover?(client_to_show)
+        break unless (0..(clients.size - 1)).cover?(self.class.client_to_show + step)
+
+        self.class.client_to_show += step
       end
 
-      client_to_show >= clients.size ? :next : :back
+      result
     end
 
     def clear_role

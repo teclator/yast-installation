@@ -20,6 +20,7 @@ describe ::Installation::SelectSystemRole do
     before do
       # reset previous test
       subject.class.original_role_id = nil
+      subject.class.client_to_show   = nil
 
       allow(Yast::ProductFeatures).to receive(:ClearOverlay)
       allow(Yast::ProductFeatures).to receive(:SetOverlay) # .with
@@ -89,6 +90,7 @@ describe ::Installation::SelectSystemRole do
 
         it "shows the last dialog when going back" do
           subject.class.original_role_id = "bar"
+          subject.class.client_to_show = 1
           allow(Yast::GetInstArgs).to receive(:going_back).and_return(true)
           expect(Yast::Wizard).to_not receive(:SetContents)
           expect(Yast::UI).to_not receive(:UserInput)
