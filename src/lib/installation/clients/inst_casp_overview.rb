@@ -23,6 +23,7 @@ require "users/widgets"
 require "y2country/widgets"
 require "ui/widgets"
 require "tune/widgets"
+require "registration/widgets/registration_code"
 
 require "installation/widgets/overview"
 require "installation/widgets/system_role"
@@ -38,6 +39,12 @@ module Installation
     include Yast::Logger
     include Yast::I18n
     include Yast::UIShortcuts
+
+    attr_accessor :registration
+
+    def initialize
+      @registration ||= Registration::Widgets::RegistrationCode.new
+    end
 
     def run
       Yast.import "UI"
@@ -78,6 +85,7 @@ module Installation
           # do not store stuff when just redrawing
           skip_store_for: [:redraw]
         )
+        ret = register_system if ret == :next
         break if ret != :redraw
       end
 
@@ -115,7 +123,7 @@ module Installation
       dashboard = Installation::Widgets::DashboardPlace.new
       quadrant_layout(
         upper_left:  VBox(
-          Registration::Widgets::RegistrationCode.new,
+          registration,
           ::Users::PasswordWidget.new(little_space: true),
           # use english us as default keyboard layout
           ::Y2Country::Widgets::KeyboardSelectionCombo.new("english-us")
@@ -140,6 +148,22 @@ module Installation
     # Returns whether we need/ed to create new UI Wizard
     def separate_wizard_needed?
       Yast::Mode.normal
+    end
+
+    def register_system
+      return :redraw if !register_base_system
+      return :redraw if !register_role
+      :next
+    end
+
+    # FIXME: still pending
+    def register_role
+      log.info("Register node role if needed")
+      :next
+    end
+
+    def register_base_system
+      registration.register
     end
   end
 end
