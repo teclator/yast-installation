@@ -43,12 +43,12 @@ module Installation
       #
       # @see #validate
       def store
-        system_role.options["controller_node"] = value
+        role.option("controller_node", value)
       end
 
       # The input field is initialized with previous stored value
       def init
-        self.value = system_role.options["controller_node"]
+        self.value = role.option("controller_node")
       end
 
       # If the value is not a valid IP or a valid FQDN it displays a popup
@@ -68,8 +68,8 @@ module Installation
         true
       end
     private
-      def system_role
-        @system_role = ::Installation::SystemRole.instance
+      def role
+        ::Installation::SystemRole.find("worker_role")
       end
     end
 
@@ -104,7 +104,7 @@ module Installation
       end
 
       def init
-        self.value = system_role.selected
+        self.value = ::Installation.SystemRole.current_id
         handle
       end
 
@@ -138,28 +138,22 @@ module Installation
 
       def store
         log.info "Applying system role '#{value}'"
-        system_role.selected = value
-        features = system_role.features.dup
+        role = ::Installation::SystemRole.select(value)
+
+        features = ::Installation::SystemRole.raw_roles
         NON_OVERLAY_ATTRIBUTES.each { |a| features.delete(a) }
         Yast::ProductFeatures.SetOverlay(features)
-        system_role.adapt_services
+        role.adapt_services
       end
 
     private
 
-
-      def system_role
-        @system_role ||= ::Installation::SystemRole.instance
-      end
-
       def roles_description
-        @roles_description ||= system_role.all.map do |r|
-          id = r["id"]
-
+        @roles_description ||= ::Installation::SystemRole.roles.map do |id, role|
           {
-            id:          id,
-            label:       Yast::ProductControl.GetTranslatedText(id),
-            description: Yast::ProductControl.GetTranslatedText(id + "_description")
+            id:          role.id,
+            label:       role.label,
+            description: role.description
           }
         end
       end

@@ -25,32 +25,90 @@ Yast.import "ProductControl"
 
 module Installation
   class SystemRole
-    include Singleton
     include Yast::Logger
 
-    attr_accessor :selected, :options
+    attr_accessor :id, :label, :description, :services, :options
 
-    def initialize
-      @roles = Yast::ProductControl.productControl.fetch("system_roles", [])
-      @selected = nil
-      @options = {}
+    def initialize(id, label, description, services, options = {})
+      @id          = id
+      @label       = label
+      @description = description
+      @services    = services || []
+      @options     = options
     end
 
-    def select(role_id, role_options = {})
-      @selected = role_id
-      @options  = role_options
+    class << self
+
+      attr_reader :current_role
+
+      # Return an array with all the role ids
+      #
+      # @return [Array<String>] array with all the role ids
+      def ids
+        roles.keys
+      end
+
+      # Read the roles from the control file
+      def raw_roles
+        @raw_roles ||= Yast::ProductControl.productControl.fetch("system_roles", [])
+      end
+
+      # @return [Hash<SystemRole>]
+      def roles
+        return @roles if @roles
+
+        @roles = raw_roles.each_with_object({}) do |raw_role, entries|
+          entries[raw_role["id"]] = SystemRole.from_control(raw_role)
+        end
+      end
+
+      def select(role_id)
+        @current_role = find(role_id)
+      end
+
+      def current
+        @current_role ? @current_role.id : nil
+      end
+
+      def find(role_id)
+        roles[role_id]
+      end
+
+      def from_control(raw_role)
+        default_args =
+          [
+            raw_role["id"],
+            raw_role["label"],
+            raw_role["description"],
+            raw_role["services"]
+          ]
+
+        new(*default_args)
+      end
+
+      def finish(role_id)
+        handler = role_id.split("_").map { |s| s.capitalize }.join
+
+        begin
+          Object.const_get("::Installation::#{handler}").run
+        rescue NameError, LoadError
+          log.info("There is no special finisher for #{role_id}")
+        end
+      end
     end
 
-    def all
-      @roles
-    end
-
-    def features
-      all.find { |r| r["id"] == selected }
-    end
-
-    def services
-      all.find { |r| r["id"] == selected  }["services"] || []
+    def option(*args)
+      key, value = args
+      case args.size
+      when 0
+        raise ArgumentError, "Missing key argument"
+      when 1
+        @options[key]
+      when 2
+        @options[key] = value
+      else
+        raise ArgumentError, "Too many arguments, only key and/or value are supported"
+      end
     end
 
     def adapt_services
@@ -60,24 +118,21 @@ module Installation
 
       Installation::Services.enabled = to_enable
     end
+  end
 
-    def installation_finish
-      case selected
-      when nil,""
-        log.info("There is no role selected, nothing to do.")
-      when "worker_role"
-        master_conf = CFA::MinionMasterConf.new
-        begin
-          master_conf.load
-        rescue Errno::ENOENT
-          log.info("The minion master.conf file does not exist, it will be created")
-        end
-        log.info("The controller node for this worker role is: #{master}")
-        master_conf.master = master
-        master_conf.save
-      else
-        log.info("No special behavior for role: #{selected}")
+  class WorkerRoleFinishHandler
+    def self.run
+      role = SystemRole.find("worker_role")
+      master_conf = CFA::MinionMasterConf.new
+      master = role.option("controller_node")
+      begin
+        master_conf.load
+      rescue Errno::ENOENT
+        log.info("The minion master.conf file does not exist, it will be created")
       end
+      log.info("The controller node for this worker role is: #{master}")
+      master_conf.master = master
+      master_conf.save
     end
   end
 end
