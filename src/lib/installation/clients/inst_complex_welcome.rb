@@ -169,6 +169,17 @@ module Yast
       Y2Packager::Product.selected_base
     end
 
+    # Convenience method to select the base product when only one product is
+    # available when upgrading.
+    #
+    # @return [Boolean] true if the product has been sucessfully selected
+    def select_product
+      return false if products.size != 1
+      return false if !Mode.update
+
+      Y2Packager::Product.select
+    end
+
     # Buttons to disable according to GetInstArgs
     #
     # @return [Array<Symbol>] Buttons to disable (:next, :back)
@@ -194,7 +205,7 @@ module Yast
     # @return [Boolean] true if a product has been selected and license
     # agreement confirmed when required; false otherwise
     def product_selection_finished?
-      if selected_product.nil?
+      if selected_product.nil? && !select_product
         Yast::Popup.Error(_("Please select a product to install."))
         return false
       elsif license_confirmation_required? && !selected_product.license_confirmed?
